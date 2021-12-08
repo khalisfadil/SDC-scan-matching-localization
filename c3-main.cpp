@@ -130,12 +130,12 @@ Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose start
 	pcl::console::TicToc time;
 	time.tic();
 	pcl::IterativeClosestPoint<PointT, PointT> icp;
-	int iterations = 200;
+	int iterations = 5;
 	icp.setMaximumIterations(iterations);
 	icp.setInputSource(transformSource);
 	icp.setInputTarget(target);
-	//icp.setMaxCorrespondenceDistance(2);
-	//icp.setTransformationEpsilon(0.001);
+	icp.setMaxCorrespondenceDistance(2);
+	icp.setTransformationEpsilon(0.00001);
 	//icp.setEuclideanFitnessEpsilon(.05);
 	//icp.setRANSACOutlierRejectionThreshold (10);
 
@@ -145,10 +145,10 @@ Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose start
 
 	if (icp.hasConverged())
 	{
-		//std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
+		std::cout << "\nICP has converged, score is " << icp.getFitnessScore() << std::endl;
 		transformation_matrix = icp.getFinalTransformation().cast<double>();
 		transformation_matrix = transformation_matrix * initTransform;
-		//print4x4Matrix(transformation_matrix);
+		print4x4Matrix(transformation_matrix);
 
 		/*
   		PointCloudT::Ptr corrected_scan (new PointCloudT);
@@ -270,16 +270,13 @@ int main()
 
 		if (!new_scan)
 		{
-			int n_scans = 0;
-
-			if (n_scans == 0)
-			{
-				// "The ground truth is only used at the beginning of localization, and is not utilized again. From there, the lidar data should be used to localize."
+			int num_scan = 0;
+			num_scan++;
+			if (num_scan == 0)
+			{ //guess the initial position
 				pose.position = truePose.position;
 				pose.rotation = truePose.rotation;
 			}
-			// Count the number of scans.
-			n_scans++;
 
 			new_scan = true;
 
