@@ -111,6 +111,38 @@ void drawCar(Pose pose, int num, Color color, double alpha, pcl::visualization::
 	renderBox(viewer, box, num, color, alpha);
 }
 
+Eigen::Matrix4d NDT(PointCloudT::Ptr mapCloud, PointCloudT::Ptr source, Pose startingPose)
+{
+	pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
+	// Setting minimum transformation difference for termination condition.
+	ndt.setTransformationEpsilon(0.0000001);
+	// Setting maximum step size for More-Thuente line search.
+	//ndt.setStepSize(20);
+	//Setting Resolution of NDT grid structure (VoxelGridCovariance).
+	ndt.setResolution(1);
+	//ndt.setEuclideanFitnessEpsilon(0.00001);
+	ndt.setInputTarget(mapCloud);
+
+	pcl::console::TicToc time;
+	time.tic();
+
+	Eigen::Matrix4f init_guess = transform3D(startingPose.rotation.yaw, startingPose.rotation.pitch, startingPose.rotation.roll, startingPose.position.x, startingPose.position.y, startingPose.position.z).cast<float>();
+
+	// Setting max number of registration iterations.
+	int iterations = 60;
+	ndt.setMaximumIterations(iterations);
+	ndt.setInputSource(source);
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ndt(new pcl::PointCloud<pcl::PointXYZ>);
+	ndt.align(*cloud_ndt, init_guess);
+
+	cout << "Normal Distributions Transform has converged:" << ndt.hasConverged() << " score: " << ndt.getFitnessScore() << " time: " << time.toc() << " ms" << endl;
+
+	Eigen::Matrix4d transformation_matrix = ndt.getFinalTransformation().cast<double>();
+
+	return transformation_matrix;
+}
+
 Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose)
 {
 
@@ -130,12 +162,12 @@ Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose start
 	pcl::console::TicToc time;
 	time.tic();
 	pcl::IterativeClosestPoint<PointT, PointT> icp;
-	int iterations = 5;
+	int iterations = 30;
 	icp.setMaximumIterations(iterations);
 	icp.setInputSource(transformSource);
 	icp.setInputTarget(target);
-	icp.setMaxCorrespondenceDistance(2);
-	icp.setTransformationEpsilon(0.00001);
+	icp.setMaxCorrespondenceDistance(1);
+	icp.setTransformationEpsilon(0.00000001);
 	//icp.setEuclideanFitnessEpsilon(.05);
 	//icp.setRANSACOutlierRejectionThreshold (10);
 
@@ -148,7 +180,7 @@ Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose start
 		std::cout << "\nICP has converged, score is " << icp.getFitnessScore() << std::endl;
 		transformation_matrix = icp.getFinalTransformation().cast<double>();
 		transformation_matrix = transformation_matrix * initTransform;
-		print4x4Matrix(transformation_matrix);
+		//print4x4Matrix(transformation_matrix);
 
 		/*
   		PointCloudT::Ptr corrected_scan (new PointCloudT);
@@ -183,7 +215,7 @@ int main()
 	lidar_bp.SetAttribute("upper_fov", "15");
 	lidar_bp.SetAttribute("lower_fov", "-25");
 	lidar_bp.SetAttribute("channels", "32");
-	lidar_bp.SetAttribute("range", "25");
+	lidar_bp.SetAttribute("range", "30");
 	lidar_bp.SetAttribute("rotation_frequency", "50");
 	lidar_bp.SetAttribute("points_per_second", "500000");
 
@@ -286,7 +318,7 @@ int main()
 			//set input
 			grid.setInputCloud(scanCloud);
 			//resolution
-			double resolution = 0.5; //0.2; //0.3;
+			double resolution = 0.5;
 			grid.setLeafSize(resolution, resolution, resolution);
 			//declaration the filtered cloud
 			typename pcl::PointCloud<PointT>::Ptr cloudFiltered(new pcl::PointCloud<PointT>);
